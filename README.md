@@ -45,7 +45,7 @@ graph TD
     AgentAction["Agent 解析模型指令，执行被点名的工具"]
     
     %% 具体的工具集
-    ToolParse["工具: 页面解析 & 网页抓取 (4层降级策略)"]
+    ToolParse["工具: 页面解析与网页抓取 (4层降级策略)"]
     ToolFetch["工具: 抓取正文 (按需截断超长文本)"]
     ToolSave["工具: 保存摘要 (触发前端 UI 渲染卡片)"]
     ToolEnd["工具: 结束任务 (关闭通道)"]
