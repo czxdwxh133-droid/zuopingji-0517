@@ -18,17 +18,17 @@
 
 ### 1.资讯列表页多篇文章摘要生成
 
-<img src="C:\Users\28056\AppData\Roaming\Typora\typora-user-images\image-20260717165853164.png" alt="image-20260717165853164" style="zoom: 67%;" />
+![列表页-输入URL](screenshots/list-page-1.png)
 
-![image-20260717165931633](C:\Users\28056\AppData\Roaming\Typora\typora-user-images\image-20260717165931633.png)
+![列表页-摘要结果](screenshots/list-page-2.png)
 
 
 
 ### 2.单篇文章摘要生成
 
-### ![image-20260717170307750](C:\Users\28056\AppData\Roaming\Typora\typora-user-images\image-20260717170307750.png)
+![单篇-输入URL](screenshots/single-article-1.png)
 
-![image-20260717170604173](C:\Users\28056\AppData\Roaming\Typora\typora-user-images\image-20260717170604173.png)
+![单篇-摘要结果](screenshots/single-article-2.png)
 
 ## 工作原理
 
