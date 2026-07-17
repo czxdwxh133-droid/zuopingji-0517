@@ -34,62 +34,40 @@
 
 ```mermaid
 graph TD
-    %% =======================================
-    %% 1. 定义节点内容 (纯净双引号包裹)
-    %% =======================================
     User["用户输入 URL"]
     
-    %% 核心中枢
-    AgentState["Agent 组装请求发给大模型: 提示词(常驻) + 工具清单(常驻) + 对话历史"]
-    LLM["DeepSeek 大模型: 阅读历史，决定调用哪个工具、填什么参数"]
-    AgentAction["Agent 解析模型指令，执行被点名的工具"]
+    AgentState["Agent 组装请求发给大模型<br/>提示词 + 工具清单 + 对话历史"]
+    LLM["DeepSeek 大模型<br/>阅读历史，决定调用哪个工具"]
+    AgentAction["Agent 解析模型指令<br/>执行被点名的工具"]
     
-    %% 具体的工具集
-    ToolParse["工具: 页面解析与网页抓取 (4层降级策略)"]
-    ToolFetch["工具: 抓取正文 (按需截断超长文本)"]
-    ToolSave["工具: 保存摘要 (触发前端 UI 渲染卡片)"]
-    ToolEnd["工具: 结束任务 (关闭通道)"]
+    ToolParse["页面解析与网页抓取<br/>4层降级策略"]
+    ToolFetch["抓取正文<br/>按需截断超长文本"]
+    ToolSave["保存摘要<br/>触发前端 UI 渲染卡片"]
+    ToolEnd["结束任务<br/>关闭通道"]
     
-    End(["流程结束: 前端进度条达 100%"])
+    Finish(["流程结束<br/>前端进度条达 100%"])
 
-    %% =======================================
-    %% 2. 定义执行流 (主干直线，循环靠侧边虚线)
-    %% =======================================
     User --> AgentState
     AgentState --> LLM
     LLM --> AgentAction
     
-    %% Agent 分发到具体工具
-    AgentAction --> |"调用: 提取列表"| ToolParse
-    AgentAction --> |"调用: 抓取正文"| ToolFetch
-    AgentAction --> |"调用: 保存摘要"| ToolSave
-    AgentAction --> |"调用: 结束任务"| ToolEnd
+    AgentAction --> ToolParse
+    AgentAction --> ToolFetch
+    AgentAction --> ToolSave
+    AgentAction --> ToolEnd
     
-    %% =======================================
-    %% 3. 核心精髓：状态写回与循环反馈 (对应截图左侧虚线)
-    %% =======================================
-    ToolParse -.-> |"结果写入历史，进入下一轮"| AgentState
+    ToolParse -.-> AgentState
     ToolFetch -.-> AgentState
     ToolSave -.-> AgentState
     
-    %% 结束分支跳出循环
-    ToolEnd --> End
+    ToolEnd --> Finish
 
-    %% =======================================
-    %% 4. 清新脱俗的极简配色 (低饱和度浅色底 + 雅致边框)
-    %% =======================================
-    
-    %% 用户/结束 (淡雅灰白)
-    classDef baseStyle fill:#F8FAFC,stroke:#CBD5E1,stroke-width:1px,color:#475569
-    %% Agent 状态/执行 (清透薄荷绿)
-    classDef agentStyle fill:#F0FDF4,stroke:#86EFAC,stroke-width:2px,color:#166534
-    %% 大模型 (静谧海蓝)
-    classDef llmStyle fill:#F0F9FF,stroke:#7DD3FC,stroke-width:2px,color:#0369A1
-    %% 工具层 (柔和香芋紫)
-    classDef toolStyle fill:#FAF5FF,stroke:#D8B4FE,stroke-width:2px,color:#581C87
+    classDef baseStyle fill:#F8FAFC,stroke:#CBD5E1,color:#475569
+    classDef agentStyle fill:#F0FDF4,stroke:#86EFAC,color:#166534
+    classDef llmStyle fill:#F0F9FF,stroke:#7DD3FC,color:#0369A1
+    classDef toolStyle fill:#FAF5FF,stroke:#D8B4FE,color:#581C87
 
-    %% 应用样式
-    class User,End baseStyle
+    class User,Finish baseStyle
     class AgentState,AgentAction agentStyle
     class LLM llmStyle
     class ToolParse,ToolFetch,ToolSave,ToolEnd toolStyle
