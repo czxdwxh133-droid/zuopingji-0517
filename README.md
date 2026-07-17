@@ -40,10 +40,10 @@ graph TD
     LLM["DeepSeek 大模型<br/>阅读历史，决定调用哪个工具"]
     AgentAction["Agent 解析模型指令<br/>执行被点名的工具"]
     
-    ToolParse["页面解析与网页抓取<br/>4层降级策略"]
-    ToolFetch["抓取正文<br/>按需截断超长文本"]
-    ToolSave["保存摘要<br/>触发前端 UI 渲染卡片"]
-    ToolEnd["结束任务<br/>关闭通道"]
+    ToolParse["工具：页面解析与网页抓取<br/>4层降级策略"]
+    ToolFetch["工具：抓取正文<br/>按需截断超长文本"]
+    ToolSave["工具：保存摘要<br/>触发前端 UI 渲染卡片"]
+    ToolEnd["工具：结束任务<br/>关闭通道"]
     
     Finish(["流程结束<br/>前端进度条达 100%"])
 
