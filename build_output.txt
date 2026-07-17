@@ -1,0 +1,14 @@
+  正在确定要还原的项目…
+c:\Users\28056\Desktop\作品集\资讯速览小助手\资讯速览小助手.csproj : warning NU1903: 包 "System.Text.Json" 8.0.4 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-8g4q-xg66-9fp4
+  所有项目均是最新的，无法还原。
+c:\Users\28056\Desktop\作品集\资讯速览小助手\资讯速览小助手.csproj : warning NU1903: 包 "System.Text.Json" 8.0.4 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-8g4q-xg66-9fp4
+  资讯速览小助手 -> c:\Users\28056\Desktop\作品集\资讯速览小助手\bin\Debug\net8.0\资讯速览小助手.dll
+
+已成功生成。
+
+c:\Users\28056\Desktop\作品集\资讯速览小助手\资讯速览小助手.csproj : warning NU1903: 包 "System.Text.Json" 8.0.4 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-8g4q-xg66-9fp4
+c:\Users\28056\Desktop\作品集\资讯速览小助手\资讯速览小助手.csproj : warning NU1903: 包 "System.Text.Json" 8.0.4 具有已知的 高 严重性漏洞，https://github.com/advisories/GHSA-8g4q-xg66-9fp4
+    2 个警告
+    0 个错误
+
+已用时间 00:00:01.90

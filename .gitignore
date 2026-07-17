@@ -1,0 +1,23 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.db
+*.db-shm
+*.db-wal
+.vs/
+.vscode/
+
+## 配置文件（含 API Key）
+appsettings.Development.json
+appsettings.*.local.json
+
+## 环境变量
+.env
+.env.local
+
+## OS
+.DS_Store
+Thumbs.db

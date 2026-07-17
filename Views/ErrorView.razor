@@ -1,0 +1,18 @@
+@page "/error"
+
+<PageTitle>出错了</PageTitle>
+<h1>页面发生错误</h1>
+<p>请稍后重试,或返回首页。</p>
+<a href="/">返回首页</a>
+
+@code {
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        RequestId = HttpContext?.TraceIdentifier ?? "未知";
+    }
+}

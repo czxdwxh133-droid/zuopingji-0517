@@ -1,0 +1,309 @@
+@page "/"
+@rendermode InteractiveServer
+@using System.Threading.Channels
+@implements IDisposable
+@inject NewsBriefingManager BriefingManager
+@inject ILogger<NewsBriefing> Logger
+
+<PageTitle>资讯速览小助手</PageTitle>
+
+<div class="briefing-page">
+    <div class="hero">
+        <h1 class="hero-title">资讯速览</h1>
+        <p class="hero-desc">基于 AI Agent，快速提取并总结最新资讯</p>
+    </div>
+
+    <div class="input-section">
+        <div class="input-group">
+            <input type="url" class="url-input"
+                   placeholder="输入新闻列表页或文章链接，AI 自动判断并生成摘要"
+                   @bind="_inputUrl"
+                   @bind:event="oninput"
+                   disabled="@isProcessing"
+                   @onkeydown="HandleKeyDown" />
+            <button class="btn-submit"
+                    disabled="@(isProcessing || string.IsNullOrWhiteSpace(_inputUrl))"
+                    @onclick="StartUnified">
+                @(isProcessing ? "处理中..." : "开始")
+            </button>
+        </div>
+        <div class="supported-hint">
+            <p>支持新闻列表页（如猫目 AI 快讯）和任意文章链接，Agent 自动判断页面类型并生成摘要。</p>
+        </div>
+    </div>
+
+    @if (statusMessages.Any())
+    {
+        <div class="progress-area">
+            @if (totalCount > 0 && !isFinished)
+            {
+                <div class="progress-bar-container">
+                    <div class="progress-bar" style="width: @progressPercent%"></div>
+                    <span class="progress-text">@currentCount / @totalCount</span>
+                </div>
+            }
+
+            <div class="status-list">
+                @foreach (var msg in statusMessages)
+                {
+                    <div class="status-item @msg.CssClass">
+                        <span>@msg.Text</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    @if (sourceNotSupported)
+    {
+        <div class="unsupported-banner">
+            <div class="unsupported-icon">&#x26A0;&#xFE0F;</div>
+            <div>
+                <strong>该来源暂不支持</strong>
+                <p>当前仅支持猫目 AI 快讯。请使用 <code>https://maomu.com/news</code></p>
+            </div>
+        </div>
+    }
+
+    @if (results.Any())
+    {
+        <div class="results-section">
+            <div class="results-header">
+                <h2>速览结果</h2>
+            </div>
+
+            @foreach (var result in results)
+            {
+                <div class="result-card @(result.IsSuccess ? "success" : "failed")">
+                    <div class="card-header">
+                        <div class="card-index">#@result.Index</div>
+                        <div class="card-source">@result.SourceName</div>
+                    </div>
+
+                    @if (result.IsSuccess)
+                    {
+                        <h3 class="card-title">@result.Title</h3>
+
+                        @if (!string.IsNullOrWhiteSpace(result.Summary))
+                        {
+                            <div class="card-section">
+                                <div class="section-label">摘要</div>
+                                <p>@result.Summary</p>
+                            </div>
+                        }
+
+                        <a href="@result.OriginalUrl" target="_blank" rel="noopener noreferrer" class="read-link">
+                            阅读原文 &rarr;
+                        </a>
+                    }
+                    else
+                    {
+                        <div class="failed-content">
+                            <h3 class="card-title">@result.Title</h3>
+                            <p class="error-msg">@result.ErrorMessage</p>
+                            <a href="@result.OriginalUrl" target="_blank" rel="noopener noreferrer" class="read-link muted">
+                                尝试打开原文
+                            </a>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string _inputUrl = "https://maomu.com/news";
+    private bool isProcessing;
+    private bool isFinished;
+    private bool sourceNotSupported;
+    private int currentCount;
+    private int totalCount;
+    private double progressPercent;
+
+    private readonly List<StatusMessage> statusMessages = new();
+    private readonly List<BriefingResult> results = new();
+
+    private CancellationTokenSource? _cts;
+
+    private record StatusMessage(string Text, string CssClass);
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !isProcessing && !string.IsNullOrWhiteSpace(_inputUrl))
+            await StartUnified();
+    }
+
+    private async Task StartUnified()
+    {
+        if (isProcessing || string.IsNullOrWhiteSpace(_inputUrl)) return;
+
+        isProcessing = true;
+        isFinished = false;
+        sourceNotSupported = false;
+        currentCount = 0;
+        totalCount = 0;
+        progressPercent = 0;
+        statusMessages.Clear();
+        results.Clear();
+
+        statusMessages.Add(new("Agent 正在分析页面类型...", "item-info"));
+
+        _cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        var channel = Channel.CreateUnbounded<BriefingProgressEvent>();
+
+        _ = Task.Run(async () =>
+        {
+            try { await BriefingManager.ExecuteUnifiedAsync(_inputUrl.Trim(), channel, _cts.Token); }
+            catch (OperationCanceledException) { channel.Writer.TryComplete(); }
+            catch (Exception ex)
+            {
+                try
+                {
+                    await channel.Writer.WriteAsync(new BriefingProgressEvent
+                    {
+                        Type = BriefingProgressType.Error, Message = $"发生异常：{ex.Message}", IsFinished = true
+                    });
+                }
+                catch { }
+                channel.Writer.TryComplete();
+            }
+        });
+
+        await ConsumeChannelAsync(channel);
+    }
+
+    private async Task ConsumeChannelAsync(Channel<BriefingProgressEvent> channel)
+    {
+        try
+        {
+            await foreach (var evt in channel.Reader.ReadAllAsync())
+            {
+                switch (evt.Type)
+                {
+                    case BriefingProgressType.SourceNotSupported:
+                        sourceNotSupported = true;
+                        statusMessages.Add(new(evt.Message, "item-error"));
+                        break;
+
+                    case BriefingProgressType.Info:
+                    case BriefingProgressType.Started:
+                        statusMessages.Add(new(evt.Message, "item-info"));
+                        break;
+
+                    case BriefingProgressType.ArticleProcessing:
+                        statusMessages.Add(new(evt.Message, "item-info"));
+                        if (evt.Total > 0) totalCount = evt.Total;
+                        currentCount = evt.Current;
+                        break;
+
+                    case BriefingProgressType.ArticleCompleted:
+                        statusMessages.Add(new(evt.Message, "item-success"));
+                        if (evt.Result != null) results.Add(evt.Result);
+                        currentCount = evt.Current;
+                        if (evt.Total > 0) totalCount = evt.Total;
+                        break;
+
+                    case BriefingProgressType.ArticleFailed:
+                        statusMessages.Add(new(evt.Message, "item-warning"));
+                        if (evt.Result != null) results.Add(evt.Result);
+                        currentCount = evt.Current;
+                        break;
+
+                    case BriefingProgressType.TaskCompleted:
+                        statusMessages.Add(new(evt.Message, "item-success"));
+                        isFinished = true;
+                        break;
+
+                    case BriefingProgressType.Error:
+                        statusMessages.Add(new(evt.Message, "item-error"));
+                        isFinished = true;
+                        break;
+                }
+
+                if (totalCount > 0)
+                    progressPercent = (double)currentCount / totalCount * 100;
+
+                StateHasChanged();
+            }
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}
+
+<style>
+    .briefing-page { max-width: 860px; margin: 0 auto; }
+    .hero { text-align: center; margin-bottom: 32px; }
+    .hero-title { font-size: 32px; font-weight: 800; color: #0f172a; margin-bottom: 8px; letter-spacing: -0.5px; }
+    .hero-desc { color: #64748b; font-size: 16px; }
+
+    .input-section { margin-bottom: 32px; }
+    .input-group { display: flex; gap: 12px; }
+    .url-input { flex: 1; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 15px; outline: none; transition: border-color 0.15s; }
+    .url-input:focus { border-color: #3b82f6; }
+    .url-input:disabled { background: #f1f5f9; cursor: not-allowed; }
+
+    .btn-submit { padding: 12px 28px; background: #3b82f6; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+    .btn-submit:hover:not(:disabled) { background: #2563eb; }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .supported-hint { margin-top: 12px; font-size: 13px; color: #475569; background: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; }
+    .supported-hint p { margin-bottom: 8px; }
+    .url-examples { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .url-examples li { font-size: 12px; }
+    .url-examples code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #334155; }
+
+    .progress-area { margin-bottom: 32px; }
+    .progress-bar-container { height: 6px; background: #e2e8f0; border-radius: 3px; margin-bottom: 12px; position: relative; }
+    .progress-bar { height: 100%; background: #3b82f6; border-radius: 3px; transition: width 0.3s; }
+    .progress-text { position: absolute; right: 0; top: -20px; font-size: 12px; color: #64748b; }
+
+    .status-list { max-height: 300px; overflow-y: auto; background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; padding: 12px; }
+    .status-item { padding: 6px 8px; font-size: 13px; border-radius: 4px; margin-bottom: 2px; }
+    .item-info { color: #64748b; }
+    .item-success { color: #059669; background: #ecfdf5; }
+    .item-warning { color: #d97706; background: #fffbeb; }
+    .item-error { color: #dc2626; background: #fef2f2; }
+
+    .unsupported-banner { display: flex; gap: 16px; padding: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; margin-bottom: 24px; }
+    .unsupported-banner strong { color: #dc2626; }
+    .unsupported-banner p { color: #7f1d1d; margin-top: 4px; font-size: 14px; }
+
+    .results-section { margin-top: 24px; }
+    .results-header { margin-bottom: 16px; }
+    .results-header h2 { font-size: 22px; font-weight: 700; color: #0f172a; }
+
+    .result-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 16px; transition: box-shadow 0.15s; }
+    .result-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    .result-card.success { border-left: 4px solid #3b82f6; }
+    .result-card.failed { border-left: 4px solid #f59e0b; }
+
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .card-index { font-size: 12px; font-weight: 600; color: #94a3b8; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+    .card-source { font-size: 12px; color: #3b82f6; background: #eff6ff; padding: 2px 8px; border-radius: 4px; }
+
+    .card-title { font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 16px; line-height: 1.4; }
+    .card-section { margin-bottom: 14px; }
+    .section-label { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    .card-section p { font-size: 14px; color: #334155; line-height: 1.7; }
+
+    .key-points { font-size: 13px; color: #334155; line-height: 1.8; white-space: pre-wrap; font-family: inherit; background: #f8fafc; padding: 12px; border-radius: 6px; }
+    .importance { background: #fffbeb; padding: 12px; border-radius: 6px; }
+
+    .read-link { display: inline-block; margin-top: 8px; color: #3b82f6; font-size: 14px; font-weight: 500; text-decoration: none; }
+    .read-link:hover { color: #2563eb; text-decoration: underline; }
+    .read-link.muted { color: #94a3b8; }
+
+    .failed-content { opacity: 0.8; }
+    .error-msg { color: #dc2626; font-size: 13px; margin-bottom: 8px; }
+</style>
