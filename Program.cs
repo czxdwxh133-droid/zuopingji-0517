@@ -19,6 +19,8 @@ builder.Services.AddSingleton<WebPageAccessor>(sp =>
 {
     var handler = new HttpClientHandler
     {
+        // 不走系统代理，避免本地代理（如 Clash）拦截直连请求
+        UseProxy = false,
         // 允许所有 TLS 版本，兼容老旧服务器
         SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | 
                        System.Security.Authentication.SslProtocols.Tls13,
@@ -42,7 +44,24 @@ builder.Services.Configure<DeepSeekOptions>(
 builder.Services.Configure<SupportedSourcesOptions>(
     builder.Configuration.GetSection("SupportedNewsSources"));
 
-builder.Services.AddHttpClient<DeepSeekAccessor>();
+builder.Services.AddHttpClient<DeepSeekAccessor>().ConfigurePrimaryHttpMessageHandler(() =>
+    new SocketsHttpHandler
+    {
+        UseProxy = false,   // 不走系统代理，避免本地代理（如 Clash）拦截直连请求
+        // 固定 IP 解决 DeepSeek CDN 节点不稳定问题
+        ConnectCallback = async (context, cancellationToken) =>
+        {
+            var socket = new System.Net.Sockets.Socket(
+                System.Net.Sockets.AddressFamily.InterNetwork,
+                System.Net.Sockets.SocketType.Stream,
+                System.Net.Sockets.ProtocolType.Tcp);
+            await socket.ConnectAsync(
+                new System.Net.IPEndPoint(System.Net.IPAddress.Parse("117.163.60.130"), 443),
+                cancellationToken);
+            socket.NoDelay = true;
+            return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+        }
+    });
 
 builder.Services.AddSingleton<NewsSourceEngine>();
 builder.Services.AddSingleton<AgentEngine>();
